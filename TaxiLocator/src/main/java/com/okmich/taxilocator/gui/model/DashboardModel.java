@@ -5,9 +5,10 @@
  */
 package com.okmich.taxilocator.gui.model;
 
-import com.okmich.taxilocator.FlowMediator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.table.AbstractTableModel;
 
 /**
@@ -18,6 +19,8 @@ public class DashboardModel extends AbstractTableModel {
 
     private final String[] columnNames;
     private final List<TaxiData> dataset;
+
+    private static final Logger LOG = Logger.getLogger(DashboardModel.class.getName());
 
     public DashboardModel() {
         this.columnNames = new String[]{
@@ -89,12 +92,10 @@ public class DashboardModel extends AbstractTableModel {
         } else {
             dataset.set(idx, taxiData);
         }
-        this.fireTableDataChanged();
+        try {
+            this.fireTableDataChanged();
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, e.getMessage(), e);
+        }
     }
-
-    public void add(TaxiData taxiData, FlowMediator flowMediator) {
-        add(taxiData);
-        flowMediator.update();
-    }
-
 }

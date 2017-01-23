@@ -25,7 +25,8 @@ public interface FlowMediator {
 
     /**
      *
+     * @param message
      */
-    void update();
+    void update(String message);
 
 }

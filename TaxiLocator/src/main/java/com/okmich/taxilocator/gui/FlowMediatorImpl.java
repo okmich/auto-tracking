@@ -11,22 +11,24 @@ import com.okmich.taxilocator.Subscriber;
 import com.okmich.taxilocator.gui.model.DashboardModel;
 import com.okmich.taxilocator.gui.model.TaxiData;
 import com.okmich.taxilocator.util.Utili;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.joda.time.Duration;
-import org.joda.time.Interval;
 
 /**
  *
  * @author datadev
  */
-public class FlowMediatorImpl implements FlowMediator {
+public class FlowMediatorImpl implements FlowMediator, Runnable {
 
     private static final Logger LOG = Logger.getLogger("FlowMediatorImpl");
 
+    private final ConcurrentLinkedQueue<String> buffer = new ConcurrentLinkedQueue<>();
     private final DashboardModel model;
     private final RecordCache recordCache;
     private final Subscriber subscriber;
+    private Thread thread;
 
     public FlowMediatorImpl(DashboardModel dashboardModel,
             RecordCache recordCache,
@@ -41,6 +43,8 @@ public class FlowMediatorImpl implements FlowMediator {
     public boolean connect() {
         try {
             subscriber.connect();
+            thread = new Thread(this);
+            thread.start();
         } catch (Exception e) {
             LOG.log(Level.SEVERE, e.getMessage(), e);
             return false;
@@ -53,6 +57,8 @@ public class FlowMediatorImpl implements FlowMediator {
     public boolean disconnect() {
         try {
             subscriber.disconnect();
+            thread.interrupt();
+            thread = null;
         } catch (Exception e) {
             LOG.log(Level.SEVERE, e.getMessage(), e);
             return false;
@@ -62,12 +68,8 @@ public class FlowMediatorImpl implements FlowMediator {
     }
 
     @Override
-    public void update() {
-        String value = subscriber.nextValue();
-        if (value != null && !value.trim().isEmpty()) {
-            //process the data and send to model for display
-            getDashboardModel().add(processValue(value), this);
-        }
+    public void update(String message) {
+        buffer.offer(message);
     }
 
     /**
@@ -105,6 +107,18 @@ public class FlowMediatorImpl implements FlowMediator {
 
         recordCache.setTaxiRecord(key, data.toString());
         return data;
+    }
+
+    @Override
+    public void run() {
+        String value;
+        while (true) {
+            value = buffer.poll();
+            if (value != null && !value.trim().isEmpty()) {
+                //process the data and send to model for display
+                getDashboardModel().add(processValue(value));
+            }
+        }
     }
 
 }

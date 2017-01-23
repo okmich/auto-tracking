@@ -9,7 +9,6 @@ import com.okmich.taxilocator.Subscriber;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 import com.okmich.taxilocator.FlowMediator;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import redis.clients.jedis.Protocol;
@@ -20,7 +19,6 @@ import redis.clients.jedis.Protocol;
  */
 public class JedisSubsriber extends JedisPubSub implements Subscriber, Runnable {
 
-    private final ConcurrentLinkedQueue<String> buffer = new ConcurrentLinkedQueue<>();
     private FlowMediator flowMediator;
     private final static JedisSubsriber ME = new JedisSubsriber();
     private final Jedis jedis;
@@ -43,9 +41,7 @@ public class JedisSubsriber extends JedisPubSub implements Subscriber, Runnable 
 
     @Override
     public void onMessage(String channel, String message) {
-        LOG.log(Level.INFO, "{0} has been received from {1}", new Object[]{message, channel});
-        ME.buffer.offer(message);
-        ME.flowMediator.update();
+        ME.flowMediator.update(message);
     }
 
     @Override
@@ -73,11 +69,6 @@ public class JedisSubsriber extends JedisPubSub implements Subscriber, Runnable 
     public void disconnect() {
         this.unsubscribe();
         thread.interrupt();
-    }
-
-    @Override
-    public String nextValue() {
-        return buffer.poll();
     }
 
     @Override

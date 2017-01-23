@@ -11,7 +11,7 @@ package com.okmich.taxilocator;
  */
 public interface Subscriber {
 
-    void registerMediator(FlowMediator aThis);
+    void registerMediator(FlowMediator flowMediator);
 
     /**
      *
@@ -22,11 +22,5 @@ public interface Subscriber {
      *
      */
     void disconnect();
-
-    /**
-     *
-     * @return
-     */
-    String nextValue();
 
 }
