@@ -22,52 +22,68 @@ import org.apache.spark.streaming.flume.SparkFlumeEvent;
  */
 public class App implements Serializable {
 
-    private final transient JavaStreamingContext javaStreamingContext;
-    private final String host;
-    private final int port;
+	private final transient JavaStreamingContext javaStreamingContext;
+	private final String host;
+	private final int port;
 
-    /**
+	/**
+	 *
+	 * @param master
+	 * @param appName
+	 * @param periodInMillis
+	 * @param host
+	 * @param port
+	 */
+	public App(String appName, int periodInMillis, String host,
+			int port) {
+		SparkConf conf = new SparkConf().setAppName(appName);
+		javaStreamingContext = new JavaStreamingContext(conf,
+				Durations.milliseconds(periodInMillis));
+		this.host = host;
+		this.port = port;
+	}
+
+	public static void main(String[] args) {
+		if (args.length < 4) {
+			System.err
+					.println("Usage:: <appName> <period> <host> <port_number> \n");
+			return;
+		}
+		try {
+			int period = Integer.parseInt(args[1]);
+			int port = Integer.parseInt(args[3]);
+
+			App app = new App(args[0], period, args[2], port);
+			app.initiateStreaming();
+		} catch (Exception ex) {
+			System.err.println("Error occured :: " + ex.getMessage());
+		}
+	}
+
+	/**
      *
-     * @param master
-     * @param appName
-     * @param periodInMillis
-     * @param host
-     * @param port
      */
-    public App(String master, String appName, int periodInMillis, String host, int port) {
-        SparkConf conf = new SparkConf().setMaster(master).setAppName(appName);
-        javaStreamingContext = new JavaStreamingContext(conf, Durations.milliseconds(periodInMillis));
-        this.host = host;
-        this.port = port;
-    }
+	public void initiateStreaming() {
+		JavaReceiverInputDStream<SparkFlumeEvent> flumeStream = FlumeUtils
+				.createStream(javaStreamingContext, host, port);
 
-    public static void main(String[] args) {
-        App app = new App("local[2]", "Streaming Taxis", 250, "localhost", 4422);
-        app.initiateStreaming();
-    }
+		flumeStream.foreachRDD(new VoidFunction<JavaRDD<SparkFlumeEvent>>() {
 
-    /**
-     *
-     */
-    public void initiateStreaming() {
-        JavaReceiverInputDStream<SparkFlumeEvent> flumeStream
-                = FlumeUtils.createStream(javaStreamingContext, host, port);
+			@Override
+			public void call(JavaRDD<SparkFlumeEvent> javaRDD) throws Exception {
+				javaRDD.foreach(new VoidFunction<SparkFlumeEvent>() {
+					@Override
+					public void call(SparkFlumeEvent sparkFlumeEvent)
+							throws Exception {
+						byte[] bytes = sparkFlumeEvent.event().getBody()
+								.array();
+						JedisPublisher.getInstance().publish(new String(bytes));
+					}
+				});
+			}
+		});
 
-        flumeStream.foreachRDD(new VoidFunction<JavaRDD<SparkFlumeEvent>>() {
-
-            @Override
-            public void call(JavaRDD<SparkFlumeEvent> javaRDD) throws Exception {
-                javaRDD.foreach(new VoidFunction<SparkFlumeEvent>() {
-                    @Override
-                    public void call(SparkFlumeEvent sparkFlumeEvent) throws Exception {
-                        byte[] bytes = sparkFlumeEvent.event().getBody().array();
-                        JedisPublisher.getInstance().publish(new String(bytes));
-                    }
-                });
-            }
-        });
-
-        javaStreamingContext.start();
-        javaStreamingContext.awaitTermination();
-    }
+		javaStreamingContext.start();
+		javaStreamingContext.awaitTermination();
+	}
 }
